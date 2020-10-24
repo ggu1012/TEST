@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         int size = strtoll(size_tmp, NULL, 10);
 
         printf("%s %llx,%d\n", op, addr, size);
-
+        //Errors at L 273 long.trace, trans.trace
     }
 
     
