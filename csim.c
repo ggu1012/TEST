@@ -45,7 +45,6 @@ int main(int argc, char* argv[]) {
 
         printf("%s %llx,%d\n", op, addr, size);
 
-        //askdjfl;nw;lernv;lawken;fl
     }
 
     
