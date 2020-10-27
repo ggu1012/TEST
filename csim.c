@@ -7,8 +7,8 @@
 #include "cachelab.h"
 
 typedef struct {
-    char op;
-    unsigned long int addr;
+    char op;                 // L, S or M
+    unsigned long int addr;  // Address. uint64
     int size;
 } trace_line;  // struct for trace line.
 
@@ -32,8 +32,6 @@ int main(int argc, char* argv[]) {
     if (trace == NULL)                  // print error if file is invalid
         fprintf(stderr, "Invaild Trace File.\n");
 
-    int result = 0;
-
     trace_line t;
     cache_struct cs;
 
@@ -44,17 +42,23 @@ int main(int argc, char* argv[]) {
 
     /* Cache Line implementation */
     typedef struct {
+        int index;
         int tag[cs.E];     // Stored tags
         int RUinfo[cs.E];  // Which tag is Recently Used? !! 0: Recently Used
     } cache_line;
 
     /* Cache Initialization w/ Memory allocation */
     cache_line* cache;
-    cache = malloc(sizeof(cache_line) * cs.s);  // initializes the total cache = cache_line * set
+    cache = malloc(sizeof(cache_line) *
+                   cs.s);  // initializes the total cache = cache_line * set
+
+    int result = 0;  // Checks if file read reached end or not.
 
     while (1) {
         result = fscanf(trace, " %s %lx, %d", &t.op, &t.addr, &t.size);
-        if (result == EOF) break;  // END of trace file. break.
+
+        // END of trace file. break.
+        if (result == EOF) break;
 
         // abandon instruction trace
         if (t.op == 'I') continue;
@@ -71,6 +75,49 @@ int main(int argc, char* argv[]) {
         tag = t.addr >> (cs.s + cs.b);
         block_offset = t.addr << (64 - cs.b) >> (64 - cs.b);
 
+        /////////////////////////////////////////////////////
+        /////// Important part. Cache Logics below //////////
+        /////////////////////////////////////////////////////
+
+        /* Temporary hit, miss variables for checking. 0 or 1 Values */
+        int tmp_hit = 0;
+        int tmp_miss = 0;
+        int tmp_eviction = 0;
+
+        /* First, checkout the memory access type */
+        switch (t.op) {
+            /* Load. */
+            case 'L':
+                /* Cache Walk. Checks if the index already exists in cache */
+                for (int tmp_set = 0; tmp_set < cs.s; ++tmp_set) {
+                    /* Index Exists! */
+                    if (index == cache[tmp_set].index) {
+                        /* Now Checks the tag exists in the cache line */
+                        for (int tmp_line; tmp_line < cs.E; ++tmp_line) {
+                            /* Hit ! */
+                            if (tag == cache[tmp_set].tag[tmp_line]) {
+                                tmp_hit = 1;
+                                break;
+                            } else {
+                                /* Miss.. Tag Replacement with LRU line */
+                                tmp_miss = 1;
+                                /* Checks where cache.RUinfo == cs.E - 1 */                                
+                                if (cache[tmp_set].RUinfo[tmp_line] == cs.E - 1) {
+                                    /* tag update ! */
+                                    cache[tmp_set].tag[tmp_line] = tag;
+                                }
+                            }
+                        }
+                    }
+                }
+
+            /* Store. */
+            case 'S':
+
+            /* Modify. Load and Store in order */
+            case 'M':
+        }
+
         printf("%c %lx, %d\n", t.op, t.addr, t.size);
         printf("Cache Info. tag = %d, index = %d, block_offset = %d\n", tag,
                index, block_offset);
@@ -81,5 +128,8 @@ int main(int argc, char* argv[]) {
 
     // Free cache_line
     free(cache);
+    cache = NULL;
+
+    fclose(trace);
     return 0;
 }
