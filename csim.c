@@ -6,7 +6,7 @@
 
 #include "cachelab.h"
 
-struct trace_line{
+typedef struct trace_line{
     char op;                 // L, S or M
     unsigned long int addr;  // Address. uint64
     int size;
@@ -24,10 +24,14 @@ int main(int argc, char* argv[]) {
     int miss = 0;
     int evict = 0;
 
+    int index, tag;
+    
     /* Extract cache structure from arguments */
     cs.s = atoi(argv[2]);
     cs.E = atoi(argv[4]);
     cs.b = atoi(argv[6]);
+
+    int total_set = cs.s << 1; // total_set # = 2^s
 
     /* Cache Line implementation */
     typedef struct cache_line{
@@ -37,34 +41,33 @@ int main(int argc, char* argv[]) {
     } cache_line;
 
     /* Cache Initialization w/ Memory allocation */
-    cache_line* cache = malloc(sizeof(cache_line) * (cs.s<<1)); 
+    cache_line* cache = malloc(sizeof(cache_line) * total_set); 
     // initializes the total cache = cache_line * set
+    
+    /* Every Line Buffer*/
+    trace_line* t = malloc(sizeof(trace_line));
 
-
-    /* Address Structure variable */
-    int index;
-    int tag;
 
     FILE* trace = fopen(argv[8], "r");  // open trace file
     if (trace == NULL)                  // print error if file is invalid
         fprintf(stderr, "Invaild Trace File.\n");
-    
-    for (int i = 0; i < cs.s; ++i) {
+
+
+    for (int i = 0; i < total_set; ++i) {
         for (int j = 0; j < cs.E; ++j)
             cache[i].tag[j] = -1;  // tag field is empty if tag == -1
         cache[i].valid_bit = 0;
     }
-
     int result = 0;  // Checks if file read reached end or not.
 
     while (1) {
-        result = fscanf(trace, " %s %lx, %d", &trace_line.op, &trace_line.addr, &trace_line.size);
+        result = fscanf(trace, " %s %lx, %d", &t->op, &t->addr, &t->size);
 
         // END of trace file. break.
         if (result == EOF) break;
 
         // abandon instruction trace
-        if (trace_line.op == 'I') continue;
+        if (t->op == 'I') continue;
 
         /*
                             *** Address Implementation ***
@@ -74,8 +77,8 @@ int main(int argc, char* argv[]) {
         */
 
         /* Extract Cache Information from address*/
-        index = trace_line.addr << (64 - cs.s - cs.b) >> (64 - cs.s);
-        tag = trace_line.addr >> (cs.s + cs.b);
+        index = t->addr << (64 - cs.s - cs.b) >> (64 - cs.s);
+        tag = t->addr >> (cs.s + cs.b);
 
         /////////////////////////////////////////////////////
         /////// Important part. Cache Logics below //////////
@@ -87,7 +90,7 @@ int main(int argc, char* argv[]) {
         int tmp_evict = 0;
 
         /* First, checkout the memory access type */
-        switch (trace_line.op) {
+        switch (t->op) {
             /* Load. */
             case 'L':
                 /* Cache Walk. */
@@ -148,12 +151,12 @@ int main(int argc, char* argv[]) {
         }
 
         if (tmp_hit == 1)
-            printf("%c %lx,%d hit\n", trace_line.op, trace_line.addr, trace_line.size);
+            printf("%c %lx,%d hit\n", t->op, t->addr, t->size);
         else if (tmp_miss == 1) {
             if (tmp_evict == 1)
-                printf("%c %lx,%d miss eviction\n", trace_line.op, trace_line.addr, trace_line.size);
+                printf("%c %lx,%d miss eviction\n", t->op, t->addr, t->size);
             else
-                printf("%c %lx,%d miss\n", trace_line.op, trace_line.addr, trace_line.size);
+                printf("%c %lx,%d miss\n", t->op, t->addr, t->size);
         }
 
         hit += tmp_hit;
@@ -167,6 +170,9 @@ int main(int argc, char* argv[]) {
     // Free cache_line
     free(cache);
     cache = NULL;
+
+    free(t);
+    t = NULL;
 
     fclose(trace);
     return 0;
