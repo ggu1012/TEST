@@ -6,34 +6,23 @@
 
 #include "cachelab.h"
 
-typedef struct {
+struct trace_line{
     char op;                 // L, S or M
     unsigned long int addr;  // Address. uint64
     int size;
 } trace_line;  // struct for trace line.
 
-typedef struct {
+struct cs{
     int s;       // 2^s is the number of sets
     int E;       // Associativity. # of lines per set
     int b;       // 2^b is the block size
-} cache_struct;  // Cache structure
+} cs;  // Cache structure
 
 int main(int argc, char* argv[]) {
+
     int hit = 0;
     int miss = 0;
     int evict = 0;
-
-    /* Address Structure variable */
-    int index;
-    int tag;
-    int block_offset;
-
-    FILE* trace = fopen(argv[8], "r");  // open trace file
-    if (trace == NULL)                  // print error if file is invalid
-        fprintf(stderr, "Invaild Trace File.\n");
-
-    trace_line t;
-    cache_struct cs;
 
     /* Extract cache structure from arguments */
     cs.s = atoi(argv[2]);
@@ -41,27 +30,41 @@ int main(int argc, char* argv[]) {
     cs.b = atoi(argv[6]);
 
     /* Cache Line implementation */
-    typedef struct {
-        int index;
+    typedef struct cache_line{
         int tag[cs.E];     // Stored tags
         int RUinfo[cs.E];  // Which tag is Recently Used? !! 0: Recently Used
+        int valid_bit;     // Valid bit.
     } cache_line;
 
     /* Cache Initialization w/ Memory allocation */
-    cache_line* cache;
-    cache = malloc(sizeof(cache_line) *
-                   cs.s);  // initializes the total cache = cache_line * set
+    cache_line* cache = malloc(sizeof(cache_line) * (cs.s<<1)); 
+    // initializes the total cache = cache_line * set
+
+
+    /* Address Structure variable */
+    int index;
+    int tag;
+
+    FILE* trace = fopen(argv[8], "r");  // open trace file
+    if (trace == NULL)                  // print error if file is invalid
+        fprintf(stderr, "Invaild Trace File.\n");
+    
+    for (int i = 0; i < cs.s; ++i) {
+        for (int j = 0; j < cs.E; ++j)
+            cache[i].tag[j] = -1;  // tag field is empty if tag == -1
+        cache[i].valid_bit = 0;
+    }
 
     int result = 0;  // Checks if file read reached end or not.
 
     while (1) {
-        result = fscanf(trace, " %s %lx, %d", &t.op, &t.addr, &t.size);
+        result = fscanf(trace, " %s %lx, %d", &trace_line.op, &trace_line.addr, &trace_line.size);
 
         // END of trace file. break.
         if (result == EOF) break;
 
         // abandon instruction trace
-        if (t.op == 'I') continue;
+        if (trace_line.op == 'I') continue;
 
         /*
                             *** Address Implementation ***
@@ -71,9 +74,8 @@ int main(int argc, char* argv[]) {
         */
 
         /* Extract Cache Information from address*/
-        index = t.addr << (64 - cs.s - cs.b) >> (64 - cs.s);
-        tag = t.addr >> (cs.s + cs.b);
-        block_offset = t.addr << (64 - cs.b) >> (64 - cs.b);
+        index = trace_line.addr << (64 - cs.s - cs.b) >> (64 - cs.s);
+        tag = trace_line.addr >> (cs.s + cs.b);
 
         /////////////////////////////////////////////////////
         /////// Important part. Cache Logics below //////////
@@ -82,45 +84,81 @@ int main(int argc, char* argv[]) {
         /* Temporary hit, miss variables for checking. 0 or 1 Values */
         int tmp_hit = 0;
         int tmp_miss = 0;
-        int tmp_eviction = 0;
+        int tmp_evict = 0;
 
         /* First, checkout the memory access type */
-        switch (t.op) {
+        switch (trace_line.op) {
             /* Load. */
             case 'L':
-                /* Cache Walk. Checks if the index already exists in cache */
-                for (int tmp_set = 0; tmp_set < cs.s; ++tmp_set) {
-                    /* Index Exists! */
-                    if (index == cache[tmp_set].index) {
-                        /* Now Checks the tag exists in the cache line */
-                        for (int tmp_line; tmp_line < cs.E; ++tmp_line) {
-                            /* Hit ! */
-                            if (tag == cache[tmp_set].tag[tmp_line]) {
-                                tmp_hit = 1;
+                /* Cache Walk. */
+                /* Index is filled with some data */
+                if (cache[index].valid_bit == 1) {
+                    /* Now Checks the tag exists in the cache line */
+                    for (int tmp_line = 0; tmp_line < cs.E; ++tmp_line) {
+                        /* Hit ! */
+                        if (cache[index].tag[tmp_line] == tag) {
+                            tmp_hit = 1;
+                            /* if loads Recently Used data, RUinfo remains*/
+                            if (cache[index].RUinfo[tmp_line] == 0) break;
+                            /* if not, Update data */
+                            for (int i = 0; i < cs.E; ++i) {
+                                ++cache[index].RUinfo[i];
+                            }
+                            cache[index].RUinfo[tmp_line] = 0;
+                            break;
+                        }
+                    }
+                    if (tmp_hit != 1) {
+                        /* Miss */
+                        tmp_miss = 1;
+                        tmp_evict = 1;  // First, set tmp_evict = 1
+                        /* Checks where cache.RUinfo == cs.E - 1,
+                         * which is Least Recently Used */
+                        for (int tmp_line = 0; tmp_line < cs.E; ++tmp_line) {
+                            if (cache[index].RUinfo[tmp_line] == cs.E - 1) {
+                                /* If tag field is empty, Eviction does not
+                                 * happened */
+                                if (cache[index].tag[tmp_line] == -1)
+                                    tmp_evict = 0;
+                                /* tag update */
+                                cache[index].tag[tmp_line] = tag;
+                                /* Update Recently Used data */
+                                for (int i = 0; i < cs.E; ++i)
+                                    ++cache[index].RUinfo[i];
+                                cache[index].RUinfo[tmp_line] = 0;
                                 break;
-                            } else {
-                                /* Miss.. Tag Replacement with LRU line */
-                                tmp_miss = 1;
-                                /* Checks where cache.RUinfo == cs.E - 1 */                                
-                                if (cache[tmp_set].RUinfo[tmp_line] == cs.E - 1) {
-                                    /* tag update ! */
-                                    cache[tmp_set].tag[tmp_line] = tag;
-                                }
                             }
                         }
                     }
+                    /* Miss, Fill the empty index */
+                } else {
+                    tmp_miss = 1;
+                    cache[index].tag[0] = tag;
+                    cache[index].valid_bit = 1;
+                    /* Set RUinfo array as {0, 1, ..., cs.E-1} */
+                    for (int i = 0; i < cs.E; ++i) cache[index].RUinfo[i] = i;
                 }
 
             /* Store. */
-            case 'S':
+            case 'S':;
 
             /* Modify. Load and Store in order */
-            case 'M':
+            case 'M':;
+            default:;
         }
 
-        printf("%c %lx, %d\n", t.op, t.addr, t.size);
-        printf("Cache Info. tag = %d, index = %d, block_offset = %d\n", tag,
-               index, block_offset);
+        if (tmp_hit == 1)
+            printf("%c %lx,%d hit\n", trace_line.op, trace_line.addr, trace_line.size);
+        else if (tmp_miss == 1) {
+            if (tmp_evict == 1)
+                printf("%c %lx,%d miss eviction\n", trace_line.op, trace_line.addr, trace_line.size);
+            else
+                printf("%c %lx,%d miss\n", trace_line.op, trace_line.addr, trace_line.size);
+        }
+
+        hit += tmp_hit;
+        miss += tmp_miss;
+        evict += tmp_evict;
     }
 
     printf("Cache structure. s=%d, E=%d, b=%d\n", cs.s, cs.E, cs.b);
