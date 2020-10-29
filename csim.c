@@ -12,12 +12,6 @@ typedef struct trace_line{
     int size;
 } trace_line;  // struct for trace line.
 
-struct cs{
-    int s;       // 2^s is the number of sets
-    int E;       // Associativity. # of lines per set
-    int b;       // 2^b is the block size
-} cs;  // Cache structure
-
 int main(int argc, char* argv[]) {
 
     int hit = 0;
@@ -25,18 +19,19 @@ int main(int argc, char* argv[]) {
     int evict = 0;
 
     int index, tag;
+    int s, E, b;
     
     /* Extract cache structure from arguments */
-    cs.s = atoi(argv[2]);
-    cs.E = atoi(argv[4]);
-    cs.b = atoi(argv[6]);
+    s = atoi(argv[2]);
+    E = atoi(argv[4]);
+    b = atoi(argv[6]);
 
-    int total_set = cs.s << 1; // total_set # = 2^s
+    int total_set = s << 1; // total_set # = 2^s
 
     /* Cache Line implementation */
     typedef struct cache_line{
-        int tag[cs.E];     // Stored tags
-        int RUinfo[cs.E];  // Which tag is Recently Used? !! 0: Recently Used
+        long int tag[E];     // Stored tags
+        int LRU[E]; // if it is LRU tag, LRU[i] = 1;
         int valid_bit;     // Valid bit.
     } cache_line;
 
@@ -54,7 +49,7 @@ int main(int argc, char* argv[]) {
 
 
     for (int i = 0; i < total_set; ++i) {
-        for (int j = 0; j < cs.E; ++j)
+        for (int j = 0; j < E; ++j)
             cache[i].tag[j] = -1;  // tag field is empty if tag == -1
         cache[i].valid_bit = 0;
     }
@@ -77,8 +72,8 @@ int main(int argc, char* argv[]) {
         */
 
         /* Extract Cache Information from address*/
-        index = t->addr << (64 - cs.s - cs.b) >> (64 - cs.s);
-        tag = t->addr >> (cs.s + cs.b);
+        index = t->addr << (64 - s - b) >> (64 - s);
+        tag = t->addr >> (s + b);
 
         /////////////////////////////////////////////////////
         /////// Important part. Cache Logics below //////////
@@ -97,17 +92,15 @@ int main(int argc, char* argv[]) {
                 /* Index is filled with some data */
                 if (cache[index].valid_bit == 1) {
                     /* Now Checks the tag exists in the cache line */
-                    for (int tmp_line = 0; tmp_line < cs.E; ++tmp_line) {
+                    for (int tmp_line = 0; tmp_line < E; ++tmp_line) {
                         /* Hit ! */
                         if (cache[index].tag[tmp_line] == tag) {
                             tmp_hit = 1;
-                            /* if loads Recently Used data, RUinfo remains*/
-                            if (cache[index].RUinfo[tmp_line] == 0) break;
-                            /* if not, Update data */
-                            for (int i = 0; i < cs.E; ++i) {
-                                ++cache[index].RUinfo[i];
-                            }
-                            cache[index].RUinfo[tmp_line] = 0;
+                            /* if Hit is LRU component, change LRU bit location*/
+                            for(int i = 0; i < E; ++i)
+                                if(cache[index.LRU[i]])
+                                cache[index].LRU[i] = 0;
+                            
                             break;
                         }
                     }
@@ -115,10 +108,10 @@ int main(int argc, char* argv[]) {
                         /* Miss */
                         tmp_miss = 1;
                         tmp_evict = 1;  // First, set tmp_evict = 1
-                        /* Checks where cache.RUinfo == cs.E - 1,
+                        /* Checks where cache.RUinfo == E - 1,
                          * which is Least Recently Used */
-                        for (int tmp_line = 0; tmp_line < cs.E; ++tmp_line) {
-                            if (cache[index].RUinfo[tmp_line] == cs.E - 1) {
+                        for (int tmp_line = 0; tmp_line < E; ++tmp_line) {
+                            if (cache[index].RUinfo[tmp_line] == E - 1) {
                                 /* If tag field is empty, Eviction does not
                                  * happened */
                                 if (cache[index].tag[tmp_line] == -1)
@@ -126,7 +119,7 @@ int main(int argc, char* argv[]) {
                                 /* tag update */
                                 cache[index].tag[tmp_line] = tag;
                                 /* Update Recently Used data */
-                                for (int i = 0; i < cs.E; ++i)
+                                for (int i = 0; i < E; ++i)
                                     ++cache[index].RUinfo[i];
                                 cache[index].RUinfo[tmp_line] = 0;
                                 break;
@@ -138,10 +131,10 @@ int main(int argc, char* argv[]) {
                     tmp_miss = 1;
                     cache[index].tag[0] = tag;
                     cache[index].valid_bit = 1;
-                    /* Set RUinfo array as {0, 1, ..., cs.E-1} */
-                    for (int i = 0; i < cs.E; ++i) cache[index].RUinfo[i] = i;
+                    /* Set RUinfo array as {0, 1, ..., E-1} */
+                    for (int i = 0; i < E; ++i) cache[index].RUinfo[i] = i;
                 }
-
+            
             /* Store. */
             case 'S':;
 
@@ -164,7 +157,7 @@ int main(int argc, char* argv[]) {
         evict += tmp_evict;
     }
 
-    printf("Cache structure. s=%d, E=%d, b=%d\n", cs.s, cs.E, cs.b);
+    printf("Cache structure. s=%d, E=%d, b=%d\n", s, E, b);
     printSummary(hit, miss, evict);
 
     // Free cache_line
