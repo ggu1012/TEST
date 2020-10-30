@@ -29,58 +29,65 @@ int main(int argc, char* argv[]) {
     int miss = 0;
     int evict = 0;
 
+    /* for address split */
     int index;     // index
     long int tag;  // tag
 
-    int set;       // set index bits
-    int lines;     // Associativity. # of lines per set
-    int b_offset;  // block offset
+    int set;      
+    int lines;     
+    int b_offset; 
 
     /* Extract cache structure from arguments */
-    int op;              // option code
-    int verbose = 0;     // verbose mode on? off?
-    char file_name[20];  // buffer for file name
+    int op;              
+    int verbose = 0;     
+    char file_name[20];  
     
     // Read option code
     while ((op = getopt(argc, argv, "vs:E:b:t:")) != -1) {
         switch (op) {
-            case 'v':   // verbose mode
+            // verbose mode
+            case 'v':  
                 verbose = 1;
                 break;
-            case 's':   // set bits
+            // set bits
+            case 's':   
                 set = atoi(optarg);
                 break;
-            case 'E':   // Associativity. # of lines
+            // Associativity. # of lines
+            case 'E':   
                 lines = atoi(optarg);
                 break;
-            case 'b':   // block offset bits.
+            // block offset bits.
+            case 'b':   
                 b_offset = atoi(optarg);
                 break;
-            case 't':   // file name option
+            // file name option    
+            case 't':   
                 memcpy(file_name, optarg, 20);
                 break;
-            default:   // Wrong parameter
+                // Wrong parameter
+            default:   
                 fprintf(stderr, "Wrong parameter\n");
                 break;
         }
     }
 
-    int total_set = 1 << set;  // total_set # = 2^s
+    // total_set # = 2^s
+    int total_set = 1 << set;  
 
     /* Cache Line implementation */
     typedef struct cache_line {
         tag_info* base;
-        int valid_bit;  // Valid bit.
+        int valid_bit;  
     } cache_line;
 
     /* Cache Line Memory allocation */
     struct cache_line* cache = malloc(sizeof(struct cache_line) * total_set);
-    // initializes the total cache = cache_line * set
 
-    struct tag_info* tmp_base;  // buffer for Linked List
+    // buffer for Linked List
+    struct tag_info* tmp_base;  
 
     /* Cache Initialization */
-
     for (int i = 0; i < total_set; ++i) {
         cache[i].valid_bit = 0;
         /* Memory allocation. base of the tag list */
@@ -102,10 +109,12 @@ int main(int argc, char* argv[]) {
         tmp_base->next = NULL;  // tail -> next = NULL
     }
 
-    int result = 0;  // Checks if file read reached end or not.
+    // Checks if file read reached end or not.
+    int result = 0;  
 
-    FILE* trace = fopen(file_name, "r");  // open trace file
-    if (trace == NULL)                    // print error if file is invalid
+    // File open part
+    FILE* trace = fopen(file_name, "r");  
+    if (trace == NULL)                    
         fprintf(stderr, "Invaild Trace File.\n");
 
     /* Every Line Buffer*/
@@ -186,6 +195,7 @@ int main(int argc, char* argv[]) {
         // store(after load) is always hit
         if (t->op == 'M') ++tmp_hit;
 
+        // verbose mode. print each line
         if (verbose == 1) {
             printf("%c %lx,%d ", t->op, t->addr, t->size);
             if (tmp_miss == 1) printf("miss ");
@@ -198,12 +208,15 @@ int main(int argc, char* argv[]) {
             printf("\n");
         }
 
+        // update hit, miss, evict
         hit += tmp_hit;
         miss += tmp_miss;
         evict += tmp_evict;
     }
 
-    for (int i = 0; i < total_set; ++i) freeList(cache[i].base);
+    // free tag list
+    for (int i = 0; i < total_set; ++i) 
+        freeList(cache[i].base);
 
     free(cache);
     cache = NULL;

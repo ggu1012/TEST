@@ -22,6 +22,35 @@ int is_transpose(int M, int N, int A[N][M], int B[M][N]);
  */
 char transpose_submit_desc[] = "Transpose submission";
 void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
+    /* For submission */
+
+    int st_row = 8;
+    int st_col = 8;  // stride for row/column
+    int tmp;         // save element
+    int zigzag = 0;
+
+    for (int i = 0; i < N; i += st_col) {
+        // horizontal block movement
+        for (int j = 0; j < M; j += st_row) {
+            /* inside one block */
+            // vertical movement
+            for (int k = i; k < i + st_col; k++) {
+                // horizontal movement
+                for (int l = j; l < j + st_row; l++) {
+                    // ->
+                    if (zigzag == 0) {
+                        tmp = A[k][l];
+                        B[l][k] = tmp;
+                    } else {
+                        // <-
+                        tmp = A[k][2*j + st_row - l -1];
+                        B[2*j + st_row - l -1][k] = tmp;
+                    }                    
+                }
+                zigzag = !zigzag;
+            }
+        }
+    }
 }
 
 /*
@@ -32,6 +61,67 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
 /*
  * trans - A simple baseline transpose function, not optimized for the cache.
  */
+
+char first_desc[] = "First Prototype. block-split";
+void zig_zag(int M, int N, int A[N][M], int B[M][N]) {
+    int st_row = 8;
+    int st_col = 8;  // stride for row/column
+    int tmp;         // save element
+
+    // Every explanation is based on array A.
+    // vertical block movement
+    for (int i = N - 1; i >= 0; i -= st_col) {
+        // horizontal block movement
+        for (int j = M - 1; j >= 0; j -= st_row) {
+            /* inside one block */
+            // vertical movement
+            for (int k = i; k > i - st_col; --k) {
+                // horizontal movement
+                for (int l = j; l > j - st_row; --l) {
+                    tmp = A[k][l];
+                    B[l][k] = tmp;
+                }
+            }
+        }
+    }
+}
+
+char tmp[] = "temporary";
+
+void nn(int M, int N, int A[N][M], int B[M][N]) {
+    /* For submission */
+
+    int st_row = 8;
+    int st_col = 8;  // stride for row/column
+    int tmp;         // save element
+    int zigzag;
+
+    // Every explanation is based on array A.
+    for (int i = N - 1; i >= 0; i -= st_col) {
+        // horizontal block movement
+        for (int j = M - 1; j >= 0; j -= st_row) {
+            /* inside one block */
+            // vertical movement
+            for (int k = i; k > i - st_col; --k) {
+                zigzag = 0;
+                // horizontal movement
+                for (int l = j; l > j - st_row; --l) {
+                    // <-
+                    if (zigzag == 0) {
+                        tmp = A[k][l];
+                        B[l][k] = tmp;
+                    } else {
+                        // ->
+                        tmp = A[k][2 * j - st_row - l];
+                        B[2 * j - st_row - l][k] = tmp;
+                    }                   
+                }
+                 zigzag = !zigzag;
+            }
+        }
+    }
+}
+
 char trans_desc[] = "Simple row-wise scan transpose";
 void trans(int M, int N, int A[N][M], int B[M][N]) {
     int i, j, tmp;
@@ -56,6 +146,8 @@ void registerFunctions() {
     registerTransFunction(transpose_submit, transpose_submit_desc);
 
     /* Register any additional transpose functions */
+    registerTransFunction(zig_zag, first_desc);
+    registerTransFunction(nn, tmp);
     registerTransFunction(trans, trans_desc);
 }
 
