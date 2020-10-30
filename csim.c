@@ -52,7 +52,6 @@ int main(int argc, char* argv[]) {
     // initializes the total cache = cache_line * set
 
     struct tag_info* tmp_base; // buffer for Linked List
-    struct tag_info* new;
 
     /* Cache Initialization */
 
@@ -141,9 +140,9 @@ int main(int argc, char* argv[]) {
                 while (tmp_base->next != NULL) {
                     tmp_base = tmp_base->next;
                 }
-                /* if tail node is not empty, eviction = 1 */
-                if (tmp_base->tag != -1) tmp_evict = 1;
                 /* Now, tmp_base : tail */
+                /* if tail node is not empty, eviction = 1 */
+                if (tmp_base->tag != -1) tmp_evict = 1;                
                 cache[index].base = InsertNode(tag, cache[index].base);
                 DeleteNode(tmp_base);
             }
@@ -155,7 +154,6 @@ int main(int argc, char* argv[]) {
             cache[index].base = InsertNode(tag, cache[index].base);
             // Delete next node
             DeleteNode(cache[index].base->next);
-            cache[index].base->next = NULL;
         }
 
         // If memory access type is 'M',
@@ -188,12 +186,6 @@ int main(int argc, char* argv[]) {
 
     printSummary(hit, miss, evict);
 
-    // Free cache_line
-    /*
-    free(tmp_base);
-    tmp_base = NULL;
-    */
-
     fclose(trace);
     return 0;
 }
@@ -220,7 +212,7 @@ void DeleteNode(struct tag_info* tag) {
         // prev -> tag -> NULL
         // prev     ->    NULL
         tag->prev->next = NULL;
-        // if input is in the middle
+    // if input is in the middle
     } else {
         // prev -> <- tag -> <- next
         // prev     -> <-    next
