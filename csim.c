@@ -30,16 +30,16 @@ int main(int argc, char* argv[]) {
     int index;     // index
     long int tag;  // tag
 
-    int s;  // set index bits
-    int E;  // Associativity. # of lines per set
-    int b;  // block offset
+    int set;  // set index bits
+    int lines;  // Associativity. # of lines per set
+    int b_offset;  // block offset
 
     /* Extract cache structure from arguments */
-    s = atoi(argv[2]);
-    E = atoi(argv[4]);
-    b = atoi(argv[6]);
+    set = atoi(argv[2]);
+    lines = atoi(argv[4]);
+    b_offset = atoi(argv[6]);
 
-    int total_set = 1 << s;  // total_set # = 2^s
+    int total_set = 1 << set;  // total_set # = 2^s
 
     /* Cache Line implementation */
     typedef struct cache_line {
@@ -103,8 +103,8 @@ int main(int argc, char* argv[]) {
         */
 
         /* Extract Cache Information from address*/
-        index = t->addr << (64 - s - b) >> (64 - s);
-        tag = t->addr >> (s + b);
+        index = t->addr << (64 - set - b_offset) >> (64 - s);
+        tag = t->addr >> (set + b_offset);
 
         /////////////////////////////////////////////////////
         /////// Important part. Cache Logics below //////////
