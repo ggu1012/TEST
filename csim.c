@@ -1,8 +1,10 @@
 /* Kim Seonghoon, y2016142212 */
 
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "cachelab.h"
 
@@ -30,14 +32,38 @@ int main(int argc, char* argv[]) {
     int index;     // index
     long int tag;  // tag
 
-    int set;  // set index bits
-    int lines;  // Associativity. # of lines per set
+    int set;       // set index bits
+    int lines;     // Associativity. # of lines per set
     int b_offset;  // block offset
 
     /* Extract cache structure from arguments */
-    set = atoi(argv[2]);
-    lines = atoi(argv[4]);
-    b_offset = atoi(argv[6]);
+    int op;              // option code
+    int verbose = 0;     // verbose mode on? off?
+    char file_name[20];  // buffer for file name
+    
+    // Read option code
+    while ((op = getopt(argc, argv, "vs:E:b:t:")) != -1) {
+        switch (op) {
+            case 'v':   // verbose mode
+                verbose = 1;
+                break;
+            case 's':   // set bits
+                set = atoi(optarg);
+                break;
+            case 'E':   // Associativity. # of lines
+                lines = atoi(optarg);
+                break;
+            case 'b':   // block offset bits.
+                b_offset = atoi(optarg);
+                break;
+            case 't':   // file name option
+                memcpy(file_name, optarg, 20);
+                break;
+            default:   // Wrong parameter
+                fprintf(stderr, "Wrong parameter\n");
+                break;
+        }
+    }
 
     int total_set = 1 << set;  // total_set # = 2^s
 
@@ -51,7 +77,7 @@ int main(int argc, char* argv[]) {
     struct cache_line* cache = malloc(sizeof(struct cache_line) * total_set);
     // initializes the total cache = cache_line * set
 
-    struct tag_info* tmp_base; // buffer for Linked List
+    struct tag_info* tmp_base;  // buffer for Linked List
 
     /* Cache Initialization */
 
@@ -64,7 +90,7 @@ int main(int argc, char* argv[]) {
         tmp_base->prev = NULL;  // head -> prev = NULL;
 
         /* Linked List. Malloc next node */
-        for (int j = 0; j < E - 1; ++j) {
+        for (int j = 0; j < lines - 1; ++j) {
             tmp_base->next = malloc(sizeof(tag_info));
             tmp_base->next->prev = tmp_base;
             // if tag field is empty, tag = -1
@@ -78,8 +104,8 @@ int main(int argc, char* argv[]) {
 
     int result = 0;  // Checks if file read reached end or not.
 
-    FILE* trace = fopen(argv[8], "r");  // open trace file
-    if (trace == NULL)                  // print error if file is invalid
+    FILE* trace = fopen(file_name, "r");  // open trace file
+    if (trace == NULL)                    // print error if file is invalid
         fprintf(stderr, "Invaild Trace File.\n");
 
     /* Every Line Buffer*/
@@ -103,7 +129,7 @@ int main(int argc, char* argv[]) {
         */
 
         /* Extract Cache Information from address*/
-        index = t->addr << (64 - set - b_offset) >> (64 - s);
+        index = t->addr << (64 - set - b_offset) >> (64 - set);
         tag = t->addr >> (set + b_offset);
 
         /////////////////////////////////////////////////////
@@ -142,7 +168,7 @@ int main(int argc, char* argv[]) {
                 }
                 /* Now, tmp_base : tail */
                 /* if tail node is not empty, eviction = 1 */
-                if (tmp_base->tag != -1) tmp_evict = 1;                
+                if (tmp_base->tag != -1) tmp_evict = 1;
                 cache[index].base = InsertNode(tag, cache[index].base);
                 DeleteNode(tmp_base);
             }
@@ -160,23 +186,24 @@ int main(int argc, char* argv[]) {
         // store(after load) is always hit
         if (t->op == 'M') ++tmp_hit;
 
-        printf("%c %lx,%d ", t->op, t->addr, t->size);
-        if (tmp_miss == 1) printf("miss ");
-        if (tmp_evict == 1) printf("eviction ");
-        if (tmp_hit == 1)
-            printf("hit ");
-        else if (tmp_hit == 2)
-            printf("hit hit ");
+        if (verbose == 1) {
+            printf("%c %lx,%d ", t->op, t->addr, t->size);
+            if (tmp_miss == 1) printf("miss ");
+            if (tmp_evict == 1) printf("eviction ");
+            if (tmp_hit == 1)
+                printf("hit ");
+            else if (tmp_hit == 2)
+                printf("hit hit ");
 
-        printf("\n");
+            printf("\n");
+        }
 
         hit += tmp_hit;
         miss += tmp_miss;
         evict += tmp_evict;
     }
 
-    for(int i=0; i<total_set; ++i)
-        freeList(cache[i].base);
+    for (int i = 0; i < total_set; ++i) freeList(cache[i].base);
 
     free(cache);
     cache = NULL;
@@ -212,12 +239,13 @@ void DeleteNode(struct tag_info* tag) {
         // prev -> tag -> NULL
         // prev     ->    NULL
         tag->prev->next = NULL;
-    // if input is in the middle
+        // if input is in the middle
     } else {
         // prev -> <- tag -> <- next
         // prev     -> <-    next
         tag->prev->next = tag->next;
-        tag->next->prev = tag->prev;    }
+        tag->next->prev = tag->prev;
+    }
 
     /* Then, delete the node */
     tag->next = NULL;
@@ -231,6 +259,7 @@ void freeList(struct tag_info* head) {
     while (head != NULL) {
         tmp = head;
         head = head->next;
-        free(tmp); tmp=NULL;
+        free(tmp);
+        tmp = NULL;
     }
 }
