@@ -1,3 +1,5 @@
+/* Kim Seonghoon, y2016142212 */
+
 /*
  * trans.c - Matrix transpose B = A^T
  *
@@ -60,7 +62,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
         }
     }
 
-    else if (M == 64 && N == 64) { // 8x8 main block
+    else if (M == 64 && N == 64) {  // 8x8 main block
         // 4x8 sub block
         // 4x4 4x4 sub block
 
@@ -124,10 +126,10 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
                     // Align B array with the data
                     // from 8x8 block
                     // B[j+4][i~i+4] ~ B[j+7][i~i+4]
-                    B[k+4][i] = e;
-                    B[k+4][i+1] = x;
-                    B[k+4][i+2] = y;
-                    B[k+4][i+3] = z;
+                    B[k + 4][i] = e;
+                    B[k + 4][i + 1] = x;
+                    B[k + 4][i + 2] = y;
+                    B[k + 4][i + 3] = z;
                 }
 
                 // Handle another remaining 4x4 sub block
@@ -147,27 +149,40 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     }
 
     else if (M == 61 && N == 67) {
-        // stride = 16
-        for (i = 0; i < N; i += 16) {
-            // horizontal block movement. left
-            for (j = 0; j < M; j += 16) {
-                // inside one block
-                // Check smaller than N for N%8!=0 boundary
-                for (k = i; k < (i + 16) && (k < N); ++k) {
-                    for (x = j; (x < j + 16) && (j < M); ++x) {
-                        if (x != k) {
-                            B[x][k] = A[k][x];
-                        } else {
-                            a = x;  // save where diagonal
-                            b = A[x][x];
-                        }
-                        B[a][a] = b;
+        // stride =8
+        // vertical
+         for (i = 0; i < N; i += 8) {
+             //horizontal
+            for (j = 0; j < M; j += 8) {
+                // block inside
+                for (k = i; k < i + 8 && k < N; ++k) {
+                    a = A[k][j];
+                    b = A[k][j + 1];
+                    c = A[k][j + 2];
+                    d = A[k][j + 3];
+                    e = A[k][j + 4];
+                    // if block reaches the end, skip this part
+                    if (j + 4 != M - 1) {
+                        x = A[k][j + 5];
+                        y = A[k][j + 6];
+                        z = A[k][j + 7];
+                    }
+                    // Then, store B elements
+                    B[j][k] = a;
+                    B[j + 1][k] = b;
+                    B[j + 2][k] = c;
+                    B[j + 3][k] = d;
+                    B[j + 4][k] = e;
+                    // if block reaches the end, skip this part
+                    if (j + 4 != M - 1) {
+                        B[j + 5][k] = x;
+                        B[j + 6][k] = y;
+                        B[j + 7][k] = z;
                     }
                 }
             }
         }
     }
-    
 }
 
 /*
@@ -285,10 +300,10 @@ void __61x67(int M, int N, int A[N][M], int B[M][N]) {
                     // Align B array with the data
                     // from 8x8 block
                     // B[j+4][i~i+4] ~ B[j+7][i~i+4]
-                    B[k+4][i] = e;
-                    B[k+4][i+1] = x;
-                    B[k+4][i+2] = y;
-                    B[k+4][i+3] = z;
+                    B[k + 4][i] = e;
+                    B[k + 4][i + 1] = x;
+                    B[k + 4][i + 2] = y;
+                    B[k + 4][i + 3] = z;
                 }
 
                 // Handle another remaining 4x4 sub block
@@ -308,23 +323,33 @@ void __61x67(int M, int N, int A[N][M], int B[M][N]) {
     }
 
     else if (M == 61 && N == 67) {
-        // stride = 16
-        c = 8;
-        for (i = 0; i < N; i += c) {
-            // horizontal block movement. left
-            for (j = 0; j < M; j += c) {
-                // inside one block
-                // Check smaller than N for N%8!=0 boundary
-                for (k = i; k < (i + c) && (k < N); ++k) {
-                    for (x = j; (x < j + c) && (j < M); ++x) {
-                        if (x != k) {
-                            B[x][k] = A[k][x];
-                        } else {
-                            a = x;  // position of diagonal 
-                            b = A[x][x]; // 
-                        }                        
+        for (i = 0; i < N; i += 8) {
+            for (j = 0; j < M; j += 8) {
+                // block inside
+                for (k = i; k < i + 8 && k < N; ++k) {
+                    a = A[k][j];
+                    b = A[k][j + 1];
+                    c = A[k][j + 2];
+                    d = A[k][j + 3];
+                    e = A[k][j + 4];
+                    // if block reaches the end, skip this part
+                    if (j + 4 != M - 1) {
+                        x = A[k][j + 5];
+                        y = A[k][j + 6];
+                        z = A[k][j + 7];
                     }
-                    B[a][a] = b;
+                    // Then, store B elements
+                    B[j][k] = a;
+                    B[j + 1][k] = b;
+                    B[j + 2][k] = c;
+                    B[j + 3][k] = d;
+                    B[j + 4][k] = e;
+                    // if block reaches the end, skip this part
+                    if (j + 4 != M - 1) {
+                        B[j + 5][k] = x;
+                        B[j + 6][k] = y;
+                        B[j + 7][k] = z;
+                    }
                 }
             }
         }
@@ -355,52 +380,6 @@ void zig_zag(int M, int N, int A[N][M], int B[M][N]) {
     }
 }
 
-char tmp[] = "temporary";
-void nn(int M, int N, int A[N][M], int B[M][N]) { /* For submission */
-
-    int i, j, k;
-    int a, b, c, d, e, f, g, h;  // save element
-
-    if (M == 32 && N == 32) {
-        // stride of main block = 8
-        // vertical block movement. down
-        for (i = 0; i < N; i += 8) {
-            // horizontal block movement. left
-            for (j = M - 8; j >= 0; j -= 8) {
-                /* inside one block */
-                // vertical stride of sub-block = 4
-                // vertical movement
-                for (k = i; k < i + 8; k++) {
-                    // First, load A elements
-                    a = A[k][j];
-                    b = A[k][j + 1];
-                    c = A[k][j + 2];
-                    d = A[k][j + 3];
-                    e = A[k][j + 4];
-                    f = A[k][j + 5];
-                    g = A[k][j + 6];
-                    h = A[k][j + 7];
-                    // Then, store B elements
-                    B[j][k] = a;
-                    B[j + 1][k] = b;
-                    B[j + 2][k] = c;
-                    B[j + 3][k] = d;
-                    B[j + 4][k] = e;
-                    B[j + 5][k] = f;
-                    B[j + 6][k] = g;
-                    B[j + 7][k] = h;
-                }
-            }
-        }
-    }
-
-    else if (M == 64 && N == 64) {
-    }
-
-    else if (M == 67 && N == 61) {
-    }
-}
-
 char trans_desc[] = "Simple row-wise scan transpose";
 void trans(int M, int N, int A[N][M], int B[M][N]) {
     int i, j, tmp;
@@ -426,7 +405,6 @@ void registerFunctions() {
 
     /* Register any additional transpose functions */
     registerTransFunction(__61x67, tmp_desc);
-    registerTransFunction(zig_zag, first_desc);
     registerTransFunction(trans, trans_desc);
 }
 
