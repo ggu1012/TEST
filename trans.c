@@ -60,62 +60,87 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
         }
     }
 
-    else if (M == 64 && N == 64) {
-        /* Main block */
-        // stride of main block = 8
-        // horizontal block movement.
-        for (j = 0; j < M; j += 8) {
-            // vertical block movement. down
-            for (i = 0; i < N; i += 8) {
-                /* sub-block */
-                // if the main block is in diagonal position,
-                // index is all the same.
-                if (i == j) {
-                    // stride of sub-block = 4
-                    // horizontal movement
-                    for (a = j; a < j + 8; a += 4) {
-                        // vertical movement
-                        for (b = i; b < i + 8; b += 4) {
-                            /* inside sub block */
-                            for (c = b; c < b + 4; c++) {
-                                // First, load A elements
-                                x = A[c][a];
-                                y = A[c][a + 1];
-                                z = A[c][a + 2];
-                                w = A[c][a + 3];
+    else if (M == 64 && N == 64) { // 8x8 main block
+        // 4x8 sub block
+        // 4x4 4x4 sub block
 
-                                // Then, store B elements
-                                B[a][c] = x;
-                                B[a + 1][c] = y;
-                                B[a + 2][c] = z;
-                                B[a + 3][c] = w;
-                            }
-                        }
-                    }
+        // Main block 8x8
+        // vertical movement
+        for (i = 0; i < N; i += 8) {
+            // horizontal movement
+            for (j = 0; j < M; j += 8) {
+                // vertical movement
+                // Sub block 4x8
+                // vertical movement
+                for (k = i; k < i + 4; ++k) {
+                    // saving values in horizontal movement
+                    a = A[k][j];
+                    b = A[k][j + 1];
+                    c = A[k][j + 2];
+                    d = A[k][j + 3];
+                    e = A[k][j + 4];
+                    x = A[k][j + 5];
+                    y = A[k][j + 6];
+                    z = A[k][j + 7];
 
-                } else {
-                    /* sub-block */
-                    // vertical stride of sub-block = 4
-                    // vertical movement
-                    for (a = j; a < j + 8; a += 4) {
-                        // horizontal movement
-                        for (b = i; b < i + 8; b += 4) {
-                            /* inside sub block */
-                            for (c = b; c < b + 4; c++) {
-                                // First, load A elements
-                                x = A[c][a];
-                                y = A[c][a + 1];
-                                z = A[c][a + 2];
-                                w = A[c][a + 3];
+                    // Save half part of B
+                    // to reduce eviction
+                    // saving in vertical movement
+                    B[j][k] = a;
+                    B[j + 1][k] = b;
+                    B[j + 2][k] = c;
+                    B[j + 3][k] = d;
 
-                                // Then, store B elements
-                                B[a][c] = x;
-                                B[a + 1][c] = y;
-                                B[a + 2][c] = z;
-                                B[a + 3][c] = w;
-                            }
-                        }
-                    }
+                    // Other half is temporarily saved
+                    // at nearby B block, where "hit" is induced
+                    B[j][k + 4] = e;
+                    B[j + 1][k + 4] = x;
+                    B[j + 2][k + 4] = y;
+                    B[j + 3][k + 4] = z;
+                }
+
+                // Sub block 4x4 (i+4, j) ~ (i+7, j+3)
+                for (k = j; k < j + 4; ++k) {
+                    a = A[i + 4][k];
+                    b = A[i + 5][k];
+                    c = A[i + 6][k];
+                    d = A[i + 7][k];
+
+                    // now, load temporarily saved block and get out
+                    // to replace with original block at that space
+                    e = B[k][i + 4];
+                    x = B[k][i + 5];
+                    y = B[k][i + 6];
+                    z = B[k][i + 7];
+
+                    // Then replace the block with new value
+                    // a, b, c, d to get advantage of remaining "hit" condition
+                    // induced by e, x, y ,z load
+                    B[k][i + 4] = a;
+                    B[k][i + 5] = b;
+                    B[k][i + 6] = c;
+                    B[k][i + 7] = d;
+
+                    // Align B array with the data
+                    // from 8x8 block
+                    // B[j+4][i~i+4] ~ B[j+7][i~i+4]
+                    B[k+4][i] = e;
+                    B[k+4][i+1] = x;
+                    B[k+4][i+2] = y;
+                    B[k+4][i+3] = z;
+                }
+
+                // Handle another remaining 4x4 sub block
+                for (k = i + 4; k < i + 8; ++k) {
+                    a = A[k][j + 4];
+                    b = A[k][j + 5];
+                    c = A[k][j + 6];
+                    d = A[k][j + 7];
+
+                    B[j + 4][k] = a;
+                    B[j + 5][k] = b;
+                    B[j + 6][k] = c;
+                    B[j + 7][k] = d;
                 }
             }
         }
@@ -235,34 +260,34 @@ void __64x64(int M, int N, int A[N][M], int B[M][N]) {
                 }
 
                 // Sub block 4x4 (i+4, j) ~ (i+7, j+3)
-                for (k = i + 4; k < i + 8; ++k) {
-                    a = A[k][j];
-                    b = A[k][j + 1];
-                    c = A[k][j + 2];
-                    d = A[k][j + 3];
+                for (k = j; k < j + 4; ++k) {
+                    a = A[i + 4][k];
+                    b = A[i + 5][k];
+                    c = A[i + 6][k];
+                    d = A[i + 7][k];
 
                     // now, load temporarily saved block and get out
                     // to replace with original block at that space
-                    e = B[j][k];
-                    x = B[j + 1][k];
-                    y = B[j + 2][k];
-                    z = B[j + 3][k];
+                    e = B[k][i + 4];
+                    x = B[k][i + 5];
+                    y = B[k][i + 6];
+                    z = B[k][i + 7];
 
                     // Then replace the block with new value
                     // a, b, c, d to get advantage of remaining "hit" condition
                     // induced by e, x, y ,z load
-                    B[j][k] = a;
-                    B[j + 1][k] = b;
-                    B[j + 2][k] = c;
-                    B[j + 3][k] = d;
+                    B[k][i + 4] = a;
+                    B[k][i + 5] = b;
+                    B[k][i + 6] = c;
+                    B[k][i + 7] = d;
 
                     // Align B array with the data
                     // from 8x8 block
                     // B[j+4][i~i+4] ~ B[j+7][i~i+4]
-                    B[j + 4][k - 4] = e;
-                    B[j + 5][k - 4] = x;
-                    B[j + 6][k - 4] = y;
-                    B[j + 7][k - 4] = z;
+                    B[k+4][i] = e;
+                    B[k+4][i+1] = x;
+                    B[k+4][i+2] = y;
+                    B[k+4][i+3] = z;
                 }
 
                 // Handle another remaining 4x4 sub block
