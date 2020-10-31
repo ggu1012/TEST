@@ -29,9 +29,10 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     int tmp;         // save element
     int zigzag = 0;
 
-    for (int i = 0; i < N; i += st_col) {
-        // horizontal block movement
-        for (int j = 0; j < M; j += st_row) {
+    // horizontal block movement
+    for (int i = 0; i < M; i += st_row) {        
+        //vertical block movement
+        for (int j = 0; j < N; j += st_col) {
             /* inside one block */
             // vertical movement
             for (int k = i; k < i + st_col; k++) {
