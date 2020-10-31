@@ -235,34 +235,34 @@ void __64x64(int M, int N, int A[N][M], int B[M][N]) {
                 }
 
                 // Sub block 4x4 (i+4, j) ~ (i+7, j+3)
-                for (k = j; k < j + 4; ++k) {
-                    a = A[i + 4][k];
-                    b = A[i + 5][k];
-                    c = A[i + 6][k];
-                    d = A[i + 7][k];
+                for (k = i + 4; k < i + 8; ++k) {
+                    a = A[k][j];
+                    b = A[k][j + 1];
+                    c = A[k][j + 2];
+                    d = A[k][j + 3];
 
                     // now, load temporarily saved block and get out
                     // to replace with original block at that space
-                    e = B[k][i + 4];
-                    x = B[k][i + 5];
-                    y = B[k][i + 6];
-                    z = B[k][i + 7];
+                    e = B[j][k];
+                    x = B[j + 1][k];
+                    y = B[j + 2][k];
+                    z = B[j + 3][k];
 
                     // Then replace the block with new value
                     // a, b, c, d to get advantage of remaining "hit" condition
                     // induced by e, x, y ,z load
-                    B[k][i + 4] = a;
-                    B[k][i + 5] = b;
-                    B[k][i + 6] = c;
-                    B[k][i + 7] = d;
+                    B[j][k] = a;
+                    B[j + 1][k] = b;
+                    B[j + 2][k] = c;
+                    B[j + 3][k] = d;
 
                     // Align B array with the data
                     // from 8x8 block
                     // B[j+4][i~i+4] ~ B[j+7][i~i+4]
-                    B[k+4][i] = e;
-                    B[k+4][i+1] = x;
-                    B[k+4][i+2] = y;
-                    B[k+4][i+3] = z;
+                    B[j + 4][k - 4] = e;
+                    B[j + 5][k - 4] = x;
+                    B[j + 6][k - 4] = y;
+                    B[j + 7][k - 4] = z;
                 }
 
                 // Handle another remaining 4x4 sub block
