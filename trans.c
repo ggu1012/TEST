@@ -25,7 +25,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     /* For submission */
 
     int i, j, k;
-    int a, b, c, d, e, x, y, z, w;
+    int a, b, c, d, e, x, y, z;
 
     if (M == 32 && N == 32) {
         // stride of main block = 8
@@ -150,7 +150,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
         // stride = 16
         for (i = 0; i < N; i += 16) {
             // horizontal block movement. left
-            for (j = 0; j < M; j += 8) {
+            for (j = 0; j < M; j += 16) {
                 // inside one block
                 // Check smaller than N for N%8!=0 boundary
                 for (k = i; k < (i + 16) && (k < N); ++k) {
@@ -167,6 +167,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
             }
         }
     }
+    
 }
 
 /*
@@ -179,8 +180,8 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
  * cache.
  */
 
-char tmp_desc[] = "64x64";
-void __64x64(int M, int N, int A[N][M], int B[M][N]) {
+char tmp_desc[] = "61x67";
+void __61x67(int M, int N, int A[N][M], int B[M][N]) {
     /* For submission */
 
     int i, j, k;
@@ -308,21 +309,22 @@ void __64x64(int M, int N, int A[N][M], int B[M][N]) {
 
     else if (M == 61 && N == 67) {
         // stride = 16
-        for (i = 0; i < N; i += 16) {
+        c = 8;
+        for (i = 0; i < N; i += c) {
             // horizontal block movement. left
-            for (j = 0; j < M; j += 16) {
+            for (j = 0; j < M; j += c) {
                 // inside one block
                 // Check smaller than N for N%8!=0 boundary
-                for (k = i; k < (i + 16) && (k < N); ++k) {
-                    for (x = j; (x < j + 16) && (j < M); ++x) {
+                for (k = i; k < (i + c) && (k < N); ++k) {
+                    for (x = j; (x < j + c) && (j < M); ++x) {
                         if (x != k) {
                             B[x][k] = A[k][x];
                         } else {
-                            a = x;  // save where diagonal
-                            b = A[x][x];
-                        }
-                        B[a][a] = b;
+                            a = x;  // position of diagonal 
+                            b = A[x][x]; // 
+                        }                        
                     }
+                    B[a][a] = b;
                 }
             }
         }
@@ -423,7 +425,7 @@ void registerFunctions() {
     registerTransFunction(transpose_submit, transpose_submit_desc);
 
     /* Register any additional transpose functions */
-    registerTransFunction(__64x64, tmp_desc);
+    registerTransFunction(__61x67, tmp_desc);
     registerTransFunction(zig_zag, first_desc);
     registerTransFunction(trans, trans_desc);
 }
