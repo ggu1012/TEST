@@ -27,7 +27,7 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     /* For submission */
 
     // iteration variable
-    int i, j, k;
+    int i, j, k, l;
 
     // Save values in register
     int ra, rb, rc, rd, re, rx, ry, rz;
@@ -66,86 +66,134 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     }
 
     else if (M == 64 && N == 64) {  // 8x8 main block
-        // 4x8 sub block
-        // 4x4 4x4 sub block
+                                    // 4x8 sub block
+                                    // 4x4 4x4 sub block
 
         // Main block 8x8
         // vertical movement
+
         for (i = 0; i < N; i += 8) {
             // horizontal movement
             for (j = 0; j < M; j += 8) {
-                // vertical movement
-                // Sub block 4x8
-                // vertical movement
-                for (k = i; k < i + 4; ++k) {
-                    // saving values in horizontal movement
-                    ra = A[k][j];
-                    rb = A[k][j + 1];
-                    rc = A[k][j + 2];
-                    rd = A[k][j + 3];
-                    re = A[k][j + 4];
-                    rx = A[k][j + 5];
-                    ry = A[k][j + 6];
-                    rz = A[k][j + 7];
+                // Sub block 4x4
+                // from upper right block,
 
-                    // Save half part of B
-                    // to reduce eviction
-                    // saving in vertical movement
-                    B[j][k] = ra;
-                    B[j + 1][k] = rb;
-                    B[j + 2][k] = rc;
-                    B[j + 3][k] = rd;
+                /*
+                     ----------------
+                    |   2   |   1   |
+                    ----------------
+                    |   3   |   4   |
+                    -----------------
+                */
 
-                    // Other half is temporarily saved
-                    // at nearby B block, where "hit" is induced
-                    B[j][k + 4] = re;
-                    B[j + 1][k + 4] = rx;
-                    B[j + 2][k + 4] = ry;
-                    B[j + 3][k + 4] = rz;
-                }
+                // counter-clockwise direction
+                // 2 -> 1 -> 3 -> 4
+                // counter-clockwise direction
+                // rd : zig-zag determine value
+                rd = 0;
+                for (k = i; k < i + 8; k += 4) {
+                    if (rd == 0) {
+                        for (l = j + 4; l >= j; l -= 4) {
+                            // read horizontal line
+                            for (ra = k; ra < k + 4; ++ra) {
+                                // For blocks at diagonal position
+                                // Just move data from A to B without transpose
+                                // Unaligned
+                                if (k == l) {
+                                    rx = A[ra][l];
+                                    ry = A[ra][l + 1];
+                                    rz = A[ra][l + 2];
+                                    re = A[ra][l + 3];
 
-                // Sub block 4x4 (i+4, j) ~ (i+7, j+3)
-                for (k = j; k < j + 4; ++k) {
-                    ra = A[i + 4][k];
-                    rb = A[i + 5][k];
-                    rc = A[i + 6][k];
-                    rd = A[i + 7][k];
+                                    B[ra][l] = rx;
+                                    B[ra][l + 1] = ry;
+                                    B[ra][l + 2] = rz;
+                                    B[ra][l + 3] = re;
+                                    // For other position
+                                    // transpose & move
+                                } else {
+                                    rx = A[ra][l];
+                                    ry = A[ra][l + 1];
+                                    rz = A[ra][l + 2];
+                                    re = A[ra][l + 3];
 
-                    // now, load temporarily saved block and get out
-                    // to replace with original block at that space
-                    re = B[k][i + 4];
-                    rx = B[k][i + 5];
-                    ry = B[k][i + 6];
-                    rz = B[k][i + 7];
+                                    B[l][ra] = rx;
+                                    B[l + 1][ra] = ry;
+                                    B[l + 2][ra] = rz;
+                                    B[l + 3][ra] = re;
+                                }
+                            }
+                        }
+                    } else {
+                        for (l = j; l < j + 8; l += 4) {
+                            // read horizontal line
+                            for (ra = k; ra < k + 4; ++ra) {
+                                // For blocks at diagonal position
+                                // Just move data from A to B without transpose
+                                // Unaligned
+                                if (k == l) {
+                                    rx = A[ra][l];
+                                    ry = A[ra][l + 1];
+                                    rz = A[ra][l + 2];
+                                    re = A[ra][l + 3];
 
-                    // Then replace the block with new value
-                    // a, b, c, d to get advantage of remaining "hit" condition
-                    // induced by e, x, y ,z load
-                    B[k][i + 4] = ra;
-                    B[k][i + 5] = rb;
-                    B[k][i + 6] = rc;
-                    B[k][i + 7] = rd;
+                                    B[ra][l] = rx;
+                                    B[ra][l + 1] = ry;
+                                    B[ra][l + 2] = rz;
+                                    B[ra][l + 3] = re;
+                                    // For other position
+                                    // transpose & move
+                                } else {
+                                    rx = A[ra][l];
+                                    ry = A[ra][l + 1];
+                                    rz = A[ra][l + 2];
+                                    re = A[ra][l + 3];
 
-                    // Align B array with the data
-                    // from 8x8 block
-                    // B[j+4][i~i+4] ~ B[j+7][i~i+4]
-                    B[k + 4][i] = re;
-                    B[k + 4][i + 1] = rx;
-                    B[k + 4][i + 2] = ry;
-                    B[k + 4][i + 3] = rz;
-                }
+                                    B[l][ra] = rx;
+                                    B[l + 1][ra] = ry;
+                                    B[l + 2][ra] = rz;
+                                    B[l + 3][ra] = re;
+                                }
+                            }
+                        }
+                    }
+                    rd = !rd;
+                }  // end of sub block handling
+                   // realign data in blocks at diagonal position
+                for (k = i; k < i + 8; k += 4) {
+                    for (l = j; l < j + 8; l += 4) {
+                        if (k != l)
+                            continue;
+                        else {
+                            // First row
+                            rx = B[l][k + 1];
+                            ry = B[l][k + 2];
+                            rz = B[l][k + 3];
 
-                // Handle another remaining 4x4 sub block
-                for (k = i + 4; k < i + 8; ++k) {
-                    ra = A[k][j + 4];
-                    rb = A[k][j + 5];
-                    rc = A[k][j + 6];
-                    rd = A[k][j + 7];
+                            B[l][k + 1] = B[k + 1][l];
+                            B[l][k + 2] = B[k + 2][l];
+                            B[l][k + 3] = B[k + 3][l];
 
-                    B[j + 4][k] = ra;
-                    B[j + 5][k] = rb;
-                    B[j + 6][k] = rc;
-                    B[j + 7][k] = rd;
+                            B[k + 1][l] = rx;
+                            B[k + 2][l] = ry;
+                            B[k + 3][l] = rz;
+
+                            // Second row
+                            rx = B[l + 1][k + 2];
+                            ry = B[l + 1][k + 3];
+
+                            B[l + 1][k + 2] = B[k + 2][l + 1];
+                            B[l + 1][k + 3] = B[k + 3][l + 1];
+
+                            B[k + 2][l + 1] = rx;
+                            B[k + 3][l + 1] = ry;
+
+                            // Third row
+                            rx = B[l + 2][k + 3];
+                            B[l + 2][k + 3] = B[k + 3][l + 2];
+                            B[k + 3][l + 2] = rx;
+                        }
+                    }
                 }
             }
         }
@@ -154,8 +202,8 @@ void transpose_submit(int M, int N, int A[N][M], int B[M][N]) {
     else if (M == 61 && N == 67) {
         // stride =8
         // vertical
-         for (i = 0; i < N; i += 8) {
-             //horizontal
+        for (i = 0; i < N; i += 8) {
+            // horizontal
             for (j = 0; j < M; j += 8) {
                 // block inside
                 for (k = i; k < i + 8 && k < N; ++k) {
