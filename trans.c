@@ -1,4 +1,3 @@
-/* Kim Seonghoon, y2016142212 */
 
 /*
  * trans.c - Matrix transpose B = A^T
